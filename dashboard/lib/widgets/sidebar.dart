@@ -226,10 +226,6 @@ class Sidebar extends StatelessWidget {
 
   Widget _buildUserAvatar(BuildContext context, AppService appService, bool isRenderCollapsed, bool isDark) {
     void openSettings() {
-      // Drawer 场景：如果抽屉开着，先关抽屉再 push
-      final sc = Scaffold.maybeOf(context);
-      if (sc?.isDrawerOpen ?? false) Navigator.pop(context);
-
       Navigator.push(context, MaterialPageRoute(builder: (_) => const UserPage()));
     }
 
@@ -242,14 +238,12 @@ class Sidebar extends StatelessWidget {
       );
     }
 
-    // 未登录：保持你原来的点击登录逻辑
+    // 未登录：保持原逻辑
     if (!appService.isLoggedIn) {
       return Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: () {
-            Navigator.push(context, MaterialPageRoute(builder: (_) => const LoginPage()));
-          },
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LoginPage())),
           child: Container(
             margin: EdgeInsets.symmetric(horizontal: isRenderCollapsed ? 4 : 8),
             padding: EdgeInsets.symmetric(horizontal: isRenderCollapsed ? 0 : 12, vertical: 12),
@@ -281,7 +275,7 @@ class Sidebar extends StatelessWidget {
       );
     }
 
-    // 已登录：ChatGPT 风格菜单（Settings / Logout）
+    // 已登录：MenuAnchor 弹出“设置/退出登录”
     return Container(
       margin: EdgeInsets.symmetric(horizontal: isRenderCollapsed ? 4 : 8),
       decoration: BoxDecoration(
@@ -319,7 +313,7 @@ class Sidebar extends StatelessWidget {
                               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: isDark ? Colors.white : Colors.black87),
                               overflow: TextOverflow.ellipsis,
                             ),
-                            const Text("在线", style: TextStyle(color: Colors.green, fontSize: 10)),
+                            const Text("在线", style: TextStyle(color: Colors.green, fontSize: 10))
                           ],
                         ),
                       ),
@@ -347,5 +341,6 @@ class Sidebar extends StatelessWidget {
       ),
     );
   }
+
 
 }

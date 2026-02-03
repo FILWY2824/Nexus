@@ -16,6 +16,13 @@ class LandingPage extends StatelessWidget {
     }
   }
 
+
+  // HTTPS 自签名证书：首次使用需要先在浏览器里打开一次后端地址并“继续访问”
+  Future<void> _launchBackendTrust() async {
+    final Uri url = Uri.parse('${AppService().baseUrl}/articles');
+    await launchUrl(url, mode: LaunchMode.platformDefault);
+  }
+
   @override
   Widget build(BuildContext context) {
     // 监听主题变化
@@ -104,6 +111,53 @@ class LandingPage extends StatelessWidget {
                         textAlign: TextAlign.center,
                         style: TextStyle(fontSize: 18, color: isDark ? Colors.grey[400] : Colors.grey[600]),
                       ),
+                      const SizedBox(height: 20),
+
+                      // ✅ HTTPS 证书信任提示（Flutter Web 自签名证书必须先信任一次）
+                      Card.filled(
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(Icons.verified_user_outlined, color: Theme.of(context).primaryColor),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      "首次访问 HTTPS：请先信任证书",
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        color: textColor,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      "如果你使用自签名证书，浏览器会拦截登录/注册请求。\n"
+                                      "点击右侧按钮打开后端地址，在浏览器里选择“高级/继续访问”。",
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        height: 1.35,
+                                        color: isDark ? Colors.grey[400] : Colors.grey[700],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              FilledButton.tonalIcon(
+                                onPressed: _launchBackendTrust,
+                                icon: const Icon(Icons.open_in_new),
+                                label: const Text("打开后端"),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
                       const SizedBox(height: 48),
                       // 大按钮
                       ElevatedButton(
