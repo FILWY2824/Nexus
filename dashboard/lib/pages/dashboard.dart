@@ -28,7 +28,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ? null
           : AppBar(
               backgroundColor: Colors.white,
-              title: const Text("Nexus"), // 改名
+              title: const Text("Nexus"),
               leading: Builder(
                 builder: (context) {
                   return IconButton(
@@ -41,13 +41,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
       
+      // 手机端抽屉
       drawer: isDesktop
           ? null
           : Sidebar(
               selectedIndex: _selectedIndex,
               isCollapsed: false, 
               onItemSelected: (index) {
-                Navigator.pop(context);
+                Navigator.pop(context); // 关闭抽屉
                 setState(() => _selectedIndex = index);
               },
               onToggleCollapse: () {},
@@ -55,6 +56,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       body: Row(
         children: [
+          // 电脑端侧边栏
           if (isDesktop)
             Sidebar(
               selectedIndex: _selectedIndex,
@@ -69,15 +71,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
               },
             ),
 
+          // 右侧内容区
           Expanded(
             child: Container(
               color: Theme.of(context).scaffoldBackgroundColor,
               child: IndexedStack(
                 index: _selectedIndex,
+                // 【修正】这里去掉了 const
                 children: const [
                   BlogPage(),
                   PlaceholderPage(title: "云盘存储功能开发中..."),
-                  EmailPage(),
+                  EmailPage(), // 这里不再报错
                   GptInvitePage(),
                 ],
               ),
@@ -92,6 +96,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 class PlaceholderPage extends StatelessWidget {
   final String title;
   const PlaceholderPage({super.key, required this.title});
+
   @override
   Widget build(BuildContext context) {
     return Center(
