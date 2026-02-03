@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../services/mock_service.dart';
 import '../pages/login_page.dart';
 import '../pages/landing_page.dart';
+import '../pages/user_page.dart';
 
 class Sidebar extends StatelessWidget {
   final int selectedIndex;
@@ -224,49 +225,127 @@ class Sidebar extends StatelessWidget {
   }
 
   Widget _buildUserAvatar(BuildContext context, AppService appService, bool isRenderCollapsed, bool isDark) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () {
-          if (!appService.isLoggedIn) {
+    void openSettings() {
+      // Drawer 场景：如果抽屉开着，先关抽屉再 push
+      final sc = Scaffold.maybeOf(context);
+      if (sc?.isDrawerOpen ?? false) Navigator.pop(context);
+
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const UserPage()));
+    }
+
+    void doLogout() {
+      appService.logout();
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const LandingPage()),
+        (route) => false,
+      );
+    }
+
+    // 未登录：保持你原来的点击登录逻辑
+    if (!appService.isLoggedIn) {
+      return Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
             Navigator.push(context, MaterialPageRoute(builder: (_) => const LoginPage()));
-          }
-        },
-        child: Container(
-          margin: EdgeInsets.symmetric(horizontal: isRenderCollapsed ? 4 : 8),
-          padding: EdgeInsets.symmetric(horizontal: isRenderCollapsed ? 0 : 12, vertical: 12),
-          decoration: BoxDecoration(
-            border: Border(top: BorderSide(color: isDark ? Colors.white12 : const Color(0xFFEEEEEE))),
-          ),
-          child: Row(
-            mainAxisAlignment: isRenderCollapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
-            children: [
-              CircleAvatar(
-                backgroundColor: appService.isLoggedIn ? Theme.of(context).primaryColor : Colors.grey[300],
-                radius: 14,
-                child: Icon(appService.isLoggedIn ? Icons.person : Icons.login, color: Colors.white, size: 14),
-              ),
-              if (!isRenderCollapsed) ...[
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        appService.isLoggedIn ? appService.currentUser!.name : "点击登录",
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: isDark ? Colors.white : Colors.black87),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      if (appService.isLoggedIn)
-                        const Text("在线", style: TextStyle(color: Colors.green, fontSize: 10))
-                    ],
-                  ),
+          },
+          child: Container(
+            margin: EdgeInsets.symmetric(horizontal: isRenderCollapsed ? 4 : 8),
+            padding: EdgeInsets.symmetric(horizontal: isRenderCollapsed ? 0 : 12, vertical: 12),
+            decoration: BoxDecoration(
+              border: Border(top: BorderSide(color: isDark ? Colors.white12 : const Color(0xFFEEEEEE))),
+            ),
+            child: Row(
+              mainAxisAlignment: isRenderCollapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
+              children: [
+                CircleAvatar(
+                  backgroundColor: Colors.grey[300],
+                  radius: 14,
+                  child: const Icon(Icons.login, color: Colors.white, size: 14),
                 ),
-              ]
-            ],
+                if (!isRenderCollapsed) ...[
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      "点击登录",
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: isDark ? Colors.white : Colors.black87),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ]
+              ],
+            ),
           ),
         ),
+      );
+    }
+
+    // 已登录：ChatGPT 风格菜单（Settings / Logout）
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: isRenderCollapsed ? 4 : 8),
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: isDark ? Colors.white12 : const Color(0xFFEEEEEE))),
+      ),
+      child: MenuAnchor(
+        style: MenuStyle(
+          shape: WidgetStatePropertyAll(RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+          elevation: const WidgetStatePropertyAll(12),
+        ),
+        builder: (context, controller, child) {
+          return Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => controller.isOpen ? controller.close() : controller.open(),
+              borderRadius: BorderRadius.circular(14),
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: isRenderCollapsed ? 0 : 12, vertical: 12),
+                child: Row(
+                  mainAxisAlignment: isRenderCollapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
+                  children: [
+                    CircleAvatar(
+                      backgroundColor: Theme.of(context).primaryColor,
+                      radius: 14,
+                      child: const Icon(Icons.person, color: Colors.white, size: 14),
+                    ),
+                    if (!isRenderCollapsed) ...[
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              appService.currentUser!.name,
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: isDark ? Colors.white : Colors.black87),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const Text("在线", style: TextStyle(color: Colors.green, fontSize: 10)),
+                          ],
+                        ),
+                      ),
+                      Icon(Icons.unfold_more, size: 18, color: isDark ? Colors.white54 : Colors.black54),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+        menuChildren: [
+          MenuItemButton(
+            leadingIcon: const Icon(Icons.settings_outlined),
+            onPressed: openSettings,
+            child: const Text("设置"),
+          ),
+          const Divider(height: 8),
+          MenuItemButton(
+            leadingIcon: const Icon(Icons.logout),
+            onPressed: doLogout,
+            child: const Text("退出登录"),
+          ),
+        ],
       ),
     );
   }
+
 }

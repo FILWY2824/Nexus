@@ -58,12 +58,11 @@ class AppService extends ChangeNotifier {
   factory AppService() => _instance;
   AppService._internal();
 
-  // ✅ 注意：把 IP 改成你 Ubuntu VM 的 IP
-  // 你现在代码里是 192.168.159.128，看起来就是 VM IP
+  // ✅ 你的 VM IP
   final String baseUrl = "http://192.168.159.128:8080/api";
 
   User? _currentUser;
-  String? _passwordInMemory; // 仅用于演示：发布文章/提升权限时传给后端校验
+  String? _passwordInMemory; // 发布/提升权限时用于后端校验
   String? _lastError;
 
   bool get isLoggedIn => _currentUser != null;
@@ -76,10 +75,51 @@ class AppService extends ChangeNotifier {
     notifyListeners();
   }
 
-  // 主题
+  // -----------------------
+  // ✅ 用户“设置”数据（本地保存）
+  // -----------------------
+  String _bio = "";
+  bool _denseMode = false;
+  bool _reduceMotion = false;
+
+  String get bio => _bio;
+  bool get denseMode => _denseMode;
+  bool get reduceMotion => _reduceMotion;
+
+  void updateProfile({String? name, String? bio}) {
+    if (_currentUser != null) {
+      _currentUser = User(
+        name: (name ?? _currentUser!.name).trim(),
+        email: _currentUser!.email,
+        role: _currentUser!.role,
+      );
+    }
+    if (bio != null) _bio = bio.trim();
+    notifyListeners();
+  }
+
+  void setDenseMode(bool v) {
+    _denseMode = v;
+    notifyListeners();
+  }
+
+  void setReduceMotion(bool v) {
+    _reduceMotion = v;
+    notifyListeners();
+  }
+
+  // -----------------------
+  // 主题（你 main.dart 已经使用 themeMode: AppService().themeMode）
+  // -----------------------
   ThemeMode _themeMode = ThemeMode.system;
   ThemeMode get themeMode => _themeMode;
 
+  void setThemeMode(ThemeMode mode) {
+    _themeMode = mode;
+    notifyListeners();
+  }
+
+  // 保留你原来的 toggleTheme（不影响）
   void toggleTheme() {
     _themeMode = (_themeMode == ThemeMode.light) ? ThemeMode.dark : ThemeMode.light;
     notifyListeners();
@@ -131,7 +171,6 @@ class AppService extends ChangeNotifier {
   // -----------------------
   // 注册
   // POST /api/register {name,email,password}
-  // 服务器强制 role=user
   // -----------------------
   Future<bool> register(String name, String email, String password) async {
     try {
@@ -204,7 +243,6 @@ class AppService extends ChangeNotifier {
         return true;
       }
 
-      // 返回体里有 message 就显示
       try {
         final data = jsonDecode(decoded);
         _setError(data['message'] ?? "提升失败：${response.statusCode}");
@@ -218,10 +256,11 @@ class AppService extends ChangeNotifier {
     }
   }
 
+  // ✅ 关键修复：退出要 notifyListeners，否则侧边栏不会刷新
   void logout() {
     _currentUser = null;
     _passwordInMemory = null;
-    _setError(null);
+    _setError(null); // 这里会 notifyListeners
   }
 
   // 给文章服务读取凭证（仅演示）
@@ -236,7 +275,6 @@ class AppService extends ChangeNotifier {
 class MockService {
   final String baseUrl = AppService().baseUrl;
 
-  // 获取文章列表（utf8 解码，避免乱码）
   Future<List<Article>> getArticles() async {
     try {
       final response = await http.get(Uri.parse('$baseUrl/articles'));
@@ -251,7 +289,6 @@ class MockService {
     return [];
   }
 
-  // 发布/更新文章：后端要求 email/password 必须是 admin
   Future<bool> publishArticle(String title, String content, String? id) async {
     try {
       final app = AppService();
