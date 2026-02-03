@@ -10,7 +10,7 @@ import 'package:http/http.dart' as http;
 class User {
   final String name;
   final String email;
-  final String role; 
+  final String role;
 
   User({required this.name, required this.email, required this.role});
 }
@@ -40,8 +40,8 @@ class Article {
       title: json['title'] ?? "无标题",
       summary: json['summary'] ?? "",
       author: json['author'] ?? "Unknown",
-      publishDate: json['publishDate'] != null 
-          ? DateTime.tryParse(json['publishDate']) ?? DateTime.now() 
+      publishDate: json['publishDate'] != null
+          ? DateTime.tryParse(json['publishDate']) ?? DateTime.now()
           : DateTime.now(),
       views: json['views'] is int ? json['views'] : int.tryParse(json['views'].toString()) ?? 0,
       content: json['content'] ?? "",
@@ -58,71 +58,185 @@ class AppService extends ChangeNotifier {
   factory AppService() => _instance;
   AppService._internal();
 
-  // 【注意】Web端测试时，浏览器会拦截跨域请求。
-  // 必须确保 C++ 后端配置了 CORS 头，否则这里会报错 XMLHttpRequest error
+  // ✅ 注意：把 IP 改成你 Ubuntu VM 的 IP
+  // 你现在代码里是 192.168.159.128，看起来就是 VM IP
   final String baseUrl = "http://192.168.159.128:8080/api";
 
   User? _currentUser;
+  String? _passwordInMemory; // 仅用于演示：发布文章/提升权限时传给后端校验
+  String? _lastError;
+
   bool get isLoggedIn => _currentUser != null;
   User? get currentUser => _currentUser;
   bool get isAdmin => _currentUser?.role == "admin";
+  String? get lastError => _lastError;
 
-  // 【修复 1】补回主题状态变量
-  ThemeMode _themeMode = ThemeMode.system;
-  ThemeMode get themeMode => _themeMode;
-
-  // 【修复 2】补回切换主题方法
-  void toggleTheme() {
-    if (_themeMode == ThemeMode.light) {
-      _themeMode = ThemeMode.dark;
-    } else {
-      _themeMode = ThemeMode.light;
-    }
+  void _setError(String? msg) {
+    _lastError = msg;
     notifyListeners();
   }
 
-  // 登录 (连接后端)
+  // 主题
+  ThemeMode _themeMode = ThemeMode.system;
+  ThemeMode get themeMode => _themeMode;
+
+  void toggleTheme() {
+    _themeMode = (_themeMode == ThemeMode.light) ? ThemeMode.dark : ThemeMode.light;
+    notifyListeners();
+  }
+
+  // -----------------------
+  // 登录
+  // POST /api/login {email,password}
+  // -----------------------
   Future<bool> login(String email, String password) async {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/login'),
-        // Web 端发送 JSON 需要设置 Header
-        headers: {"Content-Type": "application/json"}, 
+        headers: {"Content-Type": "application/json"},
         body: jsonEncode({"email": email.trim(), "password": password.trim()}),
       );
 
       final decoded = utf8.decode(response.bodyBytes);
+
       if (response.statusCode == 200) {
         final data = jsonDecode(decoded);
         if (data['status'] == 'success') {
           _currentUser = User(
-            name: data['name'],
-            email: email,
-            role: data['role'],
+            name: data['name'] ?? "User",
+            email: data['email'] ?? email.trim(),
+            role: data['role'] ?? "user",
           );
-          notifyListeners();
+          _passwordInMemory = password.trim();
+          _setError(null);
           return true;
         }
-      } else {
-        debugPrint("Login Failed: ${response.statusCode} ${response.body}");
+        _setError(data['message'] ?? "登录失败");
+        return false;
       }
+
+      if (response.statusCode == 401) {
+        _setError("账号或密码错误");
+        return false;
+      }
+
+      _setError("登录失败：${response.statusCode} $decoded");
+      return false;
     } catch (e) {
-      debugPrint("❌ Login Network Error: $e");
+      _setError("网络错误：$e");
+      return false;
     }
-    return false;
+  }
+
+  // -----------------------
+  // 注册
+  // POST /api/register {name,email,password}
+  // 服务器强制 role=user
+  // -----------------------
+  Future<bool> register(String name, String email, String password) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/register'),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "name": name.trim(),
+          "email": email.trim(),
+          "password": password.trim(),
+        }),
+      );
+
+      final decoded = utf8.decode(response.bodyBytes);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(decoded);
+        if (data['status'] == 'success') {
+          _currentUser = User(
+            name: data['name'] ?? name.trim(),
+            email: data['email'] ?? email.trim(),
+            role: data['role'] ?? "user",
+          );
+          _passwordInMemory = password.trim();
+          _setError(null);
+          return true;
+        }
+        _setError(data['message'] ?? "注册失败");
+        return false;
+      }
+
+      if (response.statusCode == 409) {
+        _setError("该邮箱已注册");
+        return false;
+      }
+
+      _setError("注册失败：${response.statusCode} $decoded");
+      return false;
+    } catch (e) {
+      _setError("网络错误：$e");
+      return false;
+    }
+  }
+
+  // -----------------------
+  // 管理员提升用户为 admin
+  // POST /api/admin/promote {adminEmail, adminPassword, targetEmail}
+  // -----------------------
+  Future<bool> promoteToAdmin(String targetEmail) async {
+    if (!isAdmin || _currentUser == null || _passwordInMemory == null) {
+      _setError("权限不足：请用管理员账号登录");
+      return false;
+    }
+
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/admin/promote'),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "adminEmail": _currentUser!.email,
+          "adminPassword": _passwordInMemory,
+          "targetEmail": targetEmail.trim(),
+        }),
+      );
+
+      final decoded = utf8.decode(response.bodyBytes);
+
+      if (response.statusCode == 200) {
+        _setError(null);
+        return true;
+      }
+
+      // 返回体里有 message 就显示
+      try {
+        final data = jsonDecode(decoded);
+        _setError(data['message'] ?? "提升失败：${response.statusCode}");
+      } catch (_) {
+        _setError("提升失败：${response.statusCode} $decoded");
+      }
+      return false;
+    } catch (e) {
+      _setError("网络错误：$e");
+      return false;
+    }
   }
 
   void logout() {
     _currentUser = null;
-    notifyListeners();
+    _passwordInMemory = null;
+    _setError(null);
   }
+
+  // 给文章服务读取凭证（仅演示）
+  String? get _emailForAuth => _currentUser?.email;
+  String? get _pwdForAuth => _passwordInMemory;
 }
 
-// 专门处理文章数据的服务
+// ===========================
+// 3. 专门处理文章数据的服务
+// ===========================
+
 class MockService {
   final String baseUrl = AppService().baseUrl;
 
-  // 获取文章列表
+  // 获取文章列表（utf8 解码，避免乱码）
   Future<List<Article>> getArticles() async {
     try {
       final response = await http.get(Uri.parse('$baseUrl/articles'));
@@ -137,16 +251,23 @@ class MockService {
     return [];
   }
 
-  // 发布/更新文章
+  // 发布/更新文章：后端要求 email/password 必须是 admin
   Future<bool> publishArticle(String title, String content, String? id) async {
     try {
-      final user = AppService().currentUser;
+      final app = AppService();
+      final user = app.currentUser;
       if (user == null) return false;
+
+      final email = app._emailForAuth;
+      final pwd = app._pwdForAuth;
+      if (email == null || pwd == null) return false;
 
       final body = {
         "title": title,
         "content": content,
         "author": user.name,
+        "email": email,
+        "password": pwd,
         if (id != null) "id": id,
       };
 
@@ -155,7 +276,11 @@ class MockService {
         headers: {"Content-Type": "application/json"},
         body: jsonEncode(body),
       );
-      return response.statusCode == 200;
+
+      if (response.statusCode == 200) return true;
+
+      debugPrint("❌ Publish Failed: ${response.statusCode} ${utf8.decode(response.bodyBytes)}");
+      return false;
     } catch (e) {
       debugPrint("❌ Publish Error: $e");
       return false;

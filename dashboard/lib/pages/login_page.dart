@@ -10,25 +10,41 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
+  final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  bool _isLogin = true; // 切换 登录/注册 视图
+
+  bool _isLogin = true;
   bool _isLoading = false;
 
-  void _submit() async {
+  Future<void> _submit() async {
     setState(() => _isLoading = true);
-    final success = await AppService().login(_emailController.text, _passwordController.text);
+
+    bool success;
+    if (_isLogin) {
+      success = await AppService().login(_emailController.text, _passwordController.text);
+    } else {
+      success = await AppService().register(
+        _nameController.text,
+        _emailController.text,
+        _passwordController.text,
+      );
+    }
+
     setState(() => _isLoading = false);
-    
+
     if (success && mounted) {
-      Navigator.pop(context); // 登录成功，返回上一页
+      Navigator.pop(context);
+    } else if (mounted) {
+      final msg = AppService().lastError ?? "操作失败";
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -49,12 +65,26 @@ class _LoginPageState extends State<LoginPage> {
             children: [
               Icon(Icons.hub, size: 64, color: Theme.of(context).primaryColor),
               const SizedBox(height: 32),
+
               Text(
                 _isLogin ? "欢迎回来" : "创建账号",
                 textAlign: TextAlign.center,
                 style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 32),
+
+              if (!_isLogin) ...[
+                TextField(
+                  controller: _nameController,
+                  decoration: const InputDecoration(
+                    labelText: "昵称 / 用户名",
+                    prefixIcon: Icon(Icons.person_outline),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+
               TextField(
                 controller: _emailController,
                 decoration: const InputDecoration(
@@ -64,29 +94,36 @@ class _LoginPageState extends State<LoginPage> {
                 ),
               ),
               const SizedBox(height: 16),
+
               TextField(
                 controller: _passwordController,
+                obscureText: true,
                 decoration: const InputDecoration(
                   labelText: "密码",
                   prefixIcon: Icon(Icons.lock_outline),
                   border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
                 ),
-                obscureText: true,
               ),
               const SizedBox(height: 24),
+
               FilledButton(
                 onPressed: _isLoading ? null : _submit,
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  child: _isLoading
+                      ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      : Text(_isLogin ? "登录" : "注册"),
                 ),
-                child: _isLoading 
-                  ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                  : Text(_isLogin ? "登录" : "注册账号", style: const TextStyle(fontSize: 16)),
               ),
+
               const SizedBox(height: 16),
+
               TextButton(
-                onPressed: () => setState(() => _isLogin = !_isLogin),
+                onPressed: _isLoading
+                    ? null
+                    : () => setState(() {
+                          _isLogin = !_isLogin;
+                        }),
                 child: Text(_isLogin ? "没有账号？去注册" : "已有账号？去登录"),
               ),
             ],

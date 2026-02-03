@@ -1,7 +1,7 @@
 // lib/pages/blog_page.dart
 import 'package:flutter/material.dart';
 import '../services/mock_service.dart';
-import 'editor_page.dart'; // 确保引入编辑器
+import 'editor_page.dart';
 
 class BlogPage extends StatefulWidget {
   const BlogPage({super.key});
@@ -13,25 +13,64 @@ class BlogPage extends StatefulWidget {
 class _BlogPageState extends State<BlogPage> {
   final MockService _apiService = MockService();
   String _searchQuery = "";
-  
-  // 用于触发刷新的 Key
-  Key _listKey = UniqueKey();
 
-  void _refreshList() {
-    setState(() => _listKey = UniqueKey());
+  Key _listKey = UniqueKey();
+  void _refreshList() => setState(() => _listKey = UniqueKey());
+
+  Future<void> _showPromoteDialog() async {
+    final controller = TextEditingController();
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("提升用户为管理员"),
+          content: TextField(
+            controller: controller,
+            decoration: const InputDecoration(
+              labelText: "目标用户邮箱（targetEmail）",
+              hintText: "example@domain.com",
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("取消")),
+            FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text("提升")),
+          ],
+        );
+      },
+    );
+
+    if (ok != true) return;
+
+    final targetEmail = controller.text.trim();
+    if (targetEmail.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("邮箱不能为空")));
+      }
+      return;
+    }
+
+    final success = await AppService().promoteToAdmin(targetEmail);
+    if (!mounted) return;
+
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("✅ 已提升为管理员")));
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppService().lastError ?? "提升失败")),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    // 获取全局状态
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
-    // 使用 ListenableBuilder 监听登录状态变化 (确保登录后按钮自动出现)
+
     return ListenableBuilder(
       listenable: AppService(),
       builder: (context, _) {
         final appService = AppService();
-        final canWrite = appService.isAdmin; // 只有 admin 才能写/改
+        final canWrite = appService.isAdmin;
 
         return LayoutBuilder(
           builder: (context, constraints) {
@@ -40,41 +79,45 @@ class _BlogPageState extends State<BlogPage> {
 
             return Scaffold(
               backgroundColor: Colors.transparent,
-              
-              // 【悬浮按钮】只有管理员登录才显示
-              floatingActionButton: canWrite ? FloatingActionButton.extended(
-                onPressed: () async {
-                  await Navigator.push(
-                    context, 
-                    MaterialPageRoute(builder: (_) => const EditorPage())
-                  );
-                  _refreshList(); // 返回后刷新列表
-                },
-                icon: const Icon(Icons.edit),
-                label: const Text("写文章"),
-              ) : null,
+
+              floatingActionButton: canWrite
+                  ? FloatingActionButton.extended(
+                      onPressed: () async {
+                        await Navigator.push(context, MaterialPageRoute(builder: (_) => const EditorPage()));
+                        _refreshList();
+                      },
+                      icon: const Icon(Icons.edit),
+                      label: const Text("写文章"),
+                    )
+                  : null,
 
               body: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 24),
-                  
-                  // 头部区域
+
                   Padding(
                     padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
                     child: Row(
                       children: [
                         const Text("文章列表", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
                         const Spacer(),
-                        if (isDesktop) 
-                          SizedBox(width: 300, child: _buildSearchBar(isDark)),
+
+                        // ✅ 管理员按钮：提升用户权限
+                        if (canWrite)
+                          IconButton(
+                            tooltip: "提升用户为管理员",
+                            onPressed: _showPromoteDialog,
+                            icon: const Icon(Icons.admin_panel_settings_outlined),
+                          ),
+
+                        if (isDesktop) SizedBox(width: 300, child: _buildSearchBar(isDark)),
                       ],
                     ),
                   ),
-                  
+
                   const SizedBox(height: 24),
 
-                  // 列表区域 (异步加载)
                   Expanded(
                     child: FutureBuilder<List<Article>>(
                       key: _listKey,
@@ -87,29 +130,23 @@ class _BlogPageState extends State<BlogPage> {
                           return Center(child: Text("加载失败: ${snapshot.error}"));
                         }
                         if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                          return Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.inbox, size: 48, color: Colors.grey[300]),
-                                const SizedBox(height: 16),
-                                const Text("暂无文章，快去发布一篇吧！", style: TextStyle(color: Colors.grey)),
-                              ],
-                            ),
-                          );
+                          return const Center(child: Text("暂无文章"));
                         }
 
-                        // 本地搜索过滤
-                        final filtered = snapshot.data!.where((a) => 
-                          a.title.toLowerCase().contains(_searchQuery.toLowerCase())
-                        ).toList();
+                        final filtered = snapshot.data!.where((a) {
+                          if (_searchQuery.isEmpty) return true;
+                          final q = _searchQuery.toLowerCase();
+                          return a.title.toLowerCase().contains(q) ||
+                              a.summary.toLowerCase().contains(q) ||
+                              a.author.toLowerCase().contains(q);
+                        }).toList();
 
-                        return ListView.separated(
-                          padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 8),
+                        return ListView.builder(
+                          padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
                           itemCount: filtered.length,
-                          separatorBuilder: (c, i) => const SizedBox(height: 16),
                           itemBuilder: (context, index) {
-                            return _buildArticleCard(context, filtered[index], isDark, canWrite);
+                            final article = filtered[index];
+                            return _buildArticleCard(article, canWrite);
                           },
                         );
                       },
@@ -118,85 +155,44 @@ class _BlogPageState extends State<BlogPage> {
                 ],
               ),
             );
-          }
+          },
         );
       },
     );
   }
 
   Widget _buildSearchBar(bool isDark) {
-    return Container(
-      height: 44, 
-      decoration: BoxDecoration(
-        color: isDark ? Colors.white.withOpacity(0.08) : Colors.grey[200], 
-        borderRadius: BorderRadius.circular(50),
+    return TextField(
+      decoration: InputDecoration(
+        hintText: "搜索文章...",
+        prefixIcon: const Icon(Icons.search),
+        filled: true,
+        fillColor: isDark ? Colors.white10 : Colors.black.withOpacity(0.04),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
       ),
-      child: TextField(
-        onChanged: (val) => setState(() => _searchQuery = val),
-        decoration: InputDecoration(
-          hintText: "搜索文章...",
-          prefixIcon: const Icon(Icons.search, size: 20, color: Colors.grey),
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20),
-        ),
-      ),
+      onChanged: (v) => setState(() => _searchQuery = v.trim()),
     );
   }
 
-  Widget _buildArticleCard(BuildContext context, Article article, bool isDark, bool canEdit) {
+  Widget _buildArticleCard(Article article, bool canWrite) {
     return Card(
-      elevation: 0,
-      color: isDark ? const Color(0xFF1E293B) : Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: isDark ? Colors.white12 : Colors.black12),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(article.title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                ),
-                // 【编辑按钮】管理员可见
-                if (canEdit)
-                  IconButton(
-                    icon: const Icon(Icons.edit_note, color: Colors.blue),
-                    tooltip: "编辑",
-                    onPressed: () async {
-                      await Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => EditorPage(article: article))
-                      );
-                      _refreshList();
-                    },
-                  ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              article.summary.isNotEmpty ? article.summary : "暂无摘要",
-              maxLines: 2, 
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[600]),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                const Icon(Icons.person, size: 14, color: Colors.grey),
-                const SizedBox(width: 4),
-                Text(article.author, style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                const SizedBox(width: 16),
-                const Icon(Icons.calendar_today, size: 14, color: Colors.grey),
-                const SizedBox(width: 4),
-                Text(article.publishDate.toString().substring(0, 10), style: const TextStyle(color: Colors.grey, fontSize: 12)),
-              ],
-            ),
-          ],
-        ),
+      margin: const EdgeInsets.only(bottom: 12),
+      child: ListTile(
+        title: Text(article.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+        subtitle: Text(article.summary, maxLines: 2, overflow: TextOverflow.ellipsis),
+        trailing: canWrite
+            ? IconButton(
+                tooltip: "编辑",
+                icon: const Icon(Icons.edit_outlined),
+                onPressed: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => EditorPage(article: article)),
+                  );
+                  _refreshList();
+                },
+              )
+            : null,
       ),
     );
   }
