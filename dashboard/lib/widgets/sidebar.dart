@@ -28,30 +28,29 @@ class Sidebar extends StatelessWidget {
         
         // 1. 颜色兼容
         final backgroundColor = isDark ? const Color(0xFF1E293B) : Colors.white;
+        final borderColor = isDark ? Colors.transparent : const Color(0xFFEEEEEE);
 
         // 2. 动画容器
         return AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          width: isCollapsed ? 70 : 260,
+          width: isCollapsed ? 72 : 260, // 稍微调整宽度，让折叠态更舒服
           decoration: BoxDecoration(
             color: backgroundColor,
-            border: (isDark || isCollapsed) 
-                ? null 
-                : const Border(right: BorderSide(color: Color(0xFFEEEEEE))),
+            border: Border(right: BorderSide(color: borderColor)),
           ),
           
-          // 3. 布局构建器：实时监听宽度，决定显示模式
           child: LayoutBuilder(
             builder: (context, constraints) {
-              // 只要宽度小于 150，就强制使用精简模式 (Icon Only)
-              // 这样能绝对避免 ListTile 在窄宽度下的报错
+              // 宽度小于 150 视为折叠态
               final isRenderCollapsed = constraints.maxWidth < 150;
 
               return Column(
                 children: [
                   const SizedBox(height: 24),
 
-                  // --- Logo 区域 ---
+                  // ===========================
+                  // 1. Logo 区域 (Nexus)
+                  // ===========================
                   Material(
                     color: Colors.transparent,
                     child: InkWell(
@@ -63,29 +62,36 @@ class Sidebar extends StatelessWidget {
                         );
                       },
                       child: Container(
-                        // 保证点击区域高度一致
                         height: 50, 
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
                         child: Row(
                           mainAxisAlignment: isRenderCollapsed 
                               ? MainAxisAlignment.center 
                               : MainAxisAlignment.start,
                           children: [
-                            Icon(
-                              Icons.hub_outlined, 
-                              color: Theme.of(context).primaryColor, 
-                              size: 28
+                            // Logo 图标：加个背景色更显眼
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).primaryColor,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(
+                                Icons.hub, 
+                                color: Colors.white, 
+                                size: 20
+                              ),
                             ),
+                            
                             if (!isRenderCollapsed) ...[
                               const SizedBox(width: 12),
-                              // 使用 Flexible 防止文字溢出报错
                               Flexible(
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      "Team Space", 
+                                      "Nexus", // 改名
                                       style: TextStyle(
                                         fontWeight: FontWeight.w900, 
                                         fontSize: 18, 
@@ -96,7 +102,7 @@ class Sidebar extends StatelessWidget {
                                     ),
                                     const Text(
                                       "Workspace", 
-                                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                                      style: TextStyle(fontSize: 11, color: Colors.grey),
                                     ),
                                   ],
                                 ),
@@ -108,9 +114,11 @@ class Sidebar extends StatelessWidget {
                     ),
                   ),
 
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 32),
 
-                  // --- 菜单列表 ---
+                  // ===========================
+                  // 2. 菜单列表
+                  // ===========================
                   Expanded(
                     child: ListView(
                       padding: EdgeInsets.zero,
@@ -123,20 +131,61 @@ class Sidebar extends StatelessWidget {
                     ),
                   ),
 
-                  // --- 折叠按钮 ---
+                  // ===========================
+                  // 3. 现代化折叠按钮
+                  // ===========================
+                  // 不再是简单的 IconButton，而是一个美观的触发区
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: IconButton(
-                      icon: Icon(
-                        isCollapsed ? Icons.keyboard_double_arrow_right : Icons.keyboard_double_arrow_left,
-                        color: Colors.grey,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: onToggleCollapse,
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          height: 40,
+                          decoration: BoxDecoration(
+                            // 加上淡淡的背景，像一个功能块
+                            color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.withOpacity(0.05),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: isDark ? Colors.white.withOpacity(0.1) : Colors.grey.withOpacity(0.2)
+                            )
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              // 图标：根据状态切换
+                              Icon(
+                                isCollapsed ? Icons.keyboard_double_arrow_right : Icons.menu_open,
+                                size: 18,
+                                color: isDark ? Colors.grey[400] : Colors.grey[700],
+                              ),
+                              // 展开时显示文字
+                              if (!isRenderCollapsed) ...[
+                                const SizedBox(width: 8),
+                                Text(
+                                  "收起侧边栏",
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: isDark ? Colors.grey[400] : Colors.grey[700],
+                                    fontWeight: FontWeight.w500
+                                  ),
+                                ),
+                              ]
+                            ],
+                          ),
+                        ),
                       ),
-                      onPressed: onToggleCollapse,
                     ),
                   ),
+
+                  const SizedBox(height: 8),
                   const Divider(height: 1),
 
-                  // --- 用户头像 ---
+                  // ===========================
+                  // 4. 用户头像
+                  // ===========================
                   Material(
                     color: Colors.transparent,
                     child: InkWell(
@@ -146,21 +195,21 @@ class Sidebar extends StatelessWidget {
                         }
                       },
                       child: Container(
-                        padding: const EdgeInsets.all(16.0),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
                         child: Row(
                           mainAxisAlignment: isRenderCollapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
                           children: [
                             CircleAvatar(
-                              backgroundColor: appService.isLoggedIn ? Theme.of(context).primaryColor : Colors.grey,
-                              radius: 16,
-                              child: Icon(appService.isLoggedIn ? Icons.person : Icons.login, color: Colors.white, size: 16),
+                              backgroundColor: appService.isLoggedIn ? Theme.of(context).primaryColor : Colors.grey[300],
+                              radius: 14,
+                              child: Icon(appService.isLoggedIn ? Icons.person : Icons.login, color: Colors.white, size: 14),
                             ),
                             if (!isRenderCollapsed) ...[
-                              const SizedBox(width: 12),
+                              const SizedBox(width: 10),
                               Expanded(
                                 child: Text(
                                   appService.isLoggedIn ? appService.currentUser!.name : "点击登录",
-                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: isDark ? Colors.white : Colors.black87),
+                                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: isDark ? Colors.white : Colors.black87),
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
@@ -180,57 +229,56 @@ class Sidebar extends StatelessWidget {
     );
   }
 
-  // 构建菜单项 (防崩核心)
+  // 构建菜单项
   Widget _buildMenuItem(BuildContext context, int index, String title, IconData icon, bool renderCollapsed) {
     final isSelected = selectedIndex == index;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final primaryColor = Theme.of(context).primaryColor;
-    final iconColor = isSelected ? primaryColor : (isDark ? Colors.grey[400] : Colors.grey);
-
-    // 选中时的背景色
-    final selectedBgColor = primaryColor.withOpacity(isDark ? 0.2 : 0.1);
+    final iconColor = isSelected ? primaryColor : (isDark ? Colors.grey[400] : Colors.grey[600]);
+    final selectedBgColor = primaryColor.withOpacity(isDark ? 0.2 : 0.08);
 
     if (renderCollapsed) {
-      // === 模式 A：折叠状态 (Icon Only) ===
-      // 直接使用 Container + Icon，不使用 ListTile，绝对不会报错
+      // --- 折叠态 (图标) ---
       return Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: () => onItemSelected(index),
+          borderRadius: BorderRadius.circular(10),
           child: Container(
-            height: 50, // 固定高度
-            margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+            height: 44,
+            margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 10),
             decoration: BoxDecoration(
               color: isSelected ? selectedBgColor : Colors.transparent,
               borderRadius: BorderRadius.circular(10),
             ),
             alignment: Alignment.center,
             child: Tooltip(
-              message: title, // 鼠标悬停显示文字
-              child: Icon(icon, color: iconColor),
+              message: title,
+              child: Icon(icon, color: iconColor, size: 22),
             ),
           ),
         ),
       );
     } else {
-      // === 模式 B：展开状态 (完整列表项) ===
-      // 宽度足够，使用标准的 ListTile
+      // --- 展开态 (列表项) ---
       return Container(
-        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
         child: ListTile(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          leading: Icon(icon, color: iconColor),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          leading: Icon(icon, color: iconColor, size: 20),
           title: Text(
             title,
             style: TextStyle(
               color: isSelected ? primaryColor : (isDark ? Colors.white70 : Colors.black87),
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+              fontSize: 14,
             ),
           ),
           selected: isSelected,
           selectedTileColor: selectedBgColor,
           onTap: () => onItemSelected(index),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+          dense: true, // 让列表项紧凑一点，更像桌面端软件
         ),
       );
     }

@@ -12,26 +12,23 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 使用 ListenableBuilder 监听 AppService 的变化
     return ListenableBuilder(
       listenable: AppService(),
       builder: (context, _) {
         return MaterialApp(
-          title: 'Nexus',
+          title: 'Nexus', // 改名
           debugShowCheckedModeBanner: false,
           
-          // --- 亮色主题配置 ---
           theme: ThemeData(
             useMaterial3: true,
             brightness: Brightness.light,
             colorScheme: ColorScheme.fromSeed(
-              seedColor: const Color(0xFF6366F1), // 你的主题色
+              seedColor: const Color(0xFF6366F1), 
               brightness: Brightness.light,
             ),
-            scaffoldBackgroundColor: const Color(0xFFF8FAFC), // 浅灰背景，类似 TuneFree
+            scaffoldBackgroundColor: const Color(0xFFF8FAFC),
           ),
           
-          // --- 深色主题配置 ---
           darkTheme: ThemeData(
             useMaterial3: true,
             brightness: Brightness.dark,
@@ -39,10 +36,9 @@ class MyApp extends StatelessWidget {
               seedColor: const Color(0xFF6366F1),
               brightness: Brightness.dark,
             ),
-            scaffoldBackgroundColor: const Color(0xFF0F172A), // 深色背景
+            scaffoldBackgroundColor: const Color(0xFF0F172A),
           ),
           
-          // --- 绑定全局 ThemeMode ---
           themeMode: AppService().themeMode, 
           
           home: const LandingPage(),
