@@ -1,6 +1,5 @@
 // lib/pages/login_page.dart
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../services/mock_service.dart';
 
 class LoginPage extends StatefulWidget {
@@ -15,7 +14,7 @@ class _LoginPageState extends State<LoginPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
-  bool _isLogin = true; // 切换 登录/注册 视图
+  bool _isLogin = true; // 登录/注册切换
   bool _isLoading = false;
 
   @override
@@ -24,11 +23,6 @@ class _LoginPageState extends State<LoginPage> {
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
-  }
-
-  Future<void> _openTrustPage() async {
-    final url = Uri.parse('${AppService().baseUrl}/articles');
-    await launchUrl(url, mode: LaunchMode.platformDefault);
   }
 
   void _showError(String msg) {
@@ -100,7 +94,7 @@ class _LoginPageState extends State<LoginPage> {
               ),
               const SizedBox(height: 10),
               Text(
-                "后端已启用 HTTPS：${AppService().baseUrl}",
+                "API: backendapi.officecy.dpdns.org",
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 12,
@@ -158,15 +152,6 @@ class _LoginPageState extends State<LoginPage> {
                         child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                       )
                     : Text(_isLogin ? "登录" : "注册账号", style: const TextStyle(fontSize: 16)),
-              ),
-
-              const SizedBox(height: 12),
-
-              // ✅ 证书信任快捷入口（自签名证书必需）
-              TextButton.icon(
-                onPressed: _openTrustPage,
-                icon: const Icon(Icons.verified_user_outlined, size: 18),
-                label: const Text("首次使用：点此打开后端地址并信任证书"),
               ),
 
               const SizedBox(height: 8),
