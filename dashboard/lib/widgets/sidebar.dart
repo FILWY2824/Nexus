@@ -7,7 +7,7 @@ import '../pages/landing_page.dart';
 class Sidebar extends StatelessWidget {
   final int selectedIndex;
   final Function(int) onItemSelected;
-  final bool isCollapsed; // 这是目标状态（由父组件控制）
+  final bool isCollapsed;
   final VoidCallback onToggleCollapse;
 
   const Sidebar({
@@ -26,12 +26,10 @@ class Sidebar extends StatelessWidget {
         final appService = AppService();
         final isDark = Theme.of(context).brightness == Brightness.dark;
         
-        // 兼容旧版 Flutter 的颜色写法
-        final backgroundColor = isDark 
-            ? const Color(0xFF1E293B) 
-            : Colors.white;
+        // 1. 颜色兼容
+        final backgroundColor = isDark ? const Color(0xFF1E293B) : Colors.white;
 
-        // 1. 外层：负责宽度的平滑动画
+        // 2. 动画容器
         return AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           width: isCollapsed ? 70 : 260,
@@ -42,13 +40,11 @@ class Sidebar extends StatelessWidget {
                 : const Border(right: BorderSide(color: Color(0xFFEEEEEE))),
           ),
           
-          // 2. 内层：LayoutBuilder 负责监听动画过程中的【实时宽度】
+          // 3. 布局构建器：实时监听宽度，决定显示模式
           child: LayoutBuilder(
             builder: (context, constraints) {
-              // 【核心修复】
-              // 不直接用 isCollapsed，而是根据当前实际宽度判断。
-              // 当宽度小于 150 时，强制认为处于“视觉折叠”状态。
-              // 这样在展开动画的初期，内容依然保持折叠样式，直到宽度足够大才弹开文字。
+              // 只要宽度小于 150，就强制使用精简模式 (Icon Only)
+              // 这样能绝对避免 ListTile 在窄宽度下的报错
               final isRenderCollapsed = constraints.maxWidth < 150;
 
               return Column(
@@ -66,12 +62,10 @@ class Sidebar extends StatelessWidget {
                           (route) => false,
                         );
                       },
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(
-                          vertical: 12, 
-                          // 根据视觉状态调整边距
-                          horizontal: isRenderCollapsed ? 8 : 24
-                        ),
+                      child: Container(
+                        // 保证点击区域高度一致
+                        height: 50, 
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
                         child: Row(
                           mainAxisAlignment: isRenderCollapsed 
                               ? MainAxisAlignment.center 
@@ -82,11 +76,12 @@ class Sidebar extends StatelessWidget {
                               color: Theme.of(context).primaryColor, 
                               size: 28
                             ),
-                            // 只有宽度足够时才显示文字
                             if (!isRenderCollapsed) ...[
                               const SizedBox(width: 12),
+                              // 使用 Flexible 防止文字溢出报错
                               Flexible(
                                 child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
@@ -96,8 +91,8 @@ class Sidebar extends StatelessWidget {
                                         fontSize: 18, 
                                         color: isDark ? Colors.white : Colors.black87
                                       ),
-                                      overflow: TextOverflow.ellipsis,
                                       maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                     const Text(
                                       "Workspace", 
@@ -133,12 +128,10 @@ class Sidebar extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: IconButton(
                       icon: Icon(
-                        // 图标依然跟随目标状态(isCollapsed)，否则动画时图标会乱跳
                         isCollapsed ? Icons.keyboard_double_arrow_right : Icons.keyboard_double_arrow_left,
                         color: Colors.grey,
                       ),
                       onPressed: onToggleCollapse,
-                      tooltip: isCollapsed ? "展开侧边栏" : "折叠侧边栏",
                     ),
                   ),
                   const Divider(height: 1),
@@ -187,57 +180,59 @@ class Sidebar extends StatelessWidget {
     );
   }
 
-  // 辅助方法：构建菜单项
+  // 构建菜单项 (防崩核心)
   Widget _buildMenuItem(BuildContext context, int index, String title, IconData icon, bool renderCollapsed) {
     final isSelected = selectedIndex == index;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryColor = Theme.of(context).primaryColor;
+    final iconColor = isSelected ? primaryColor : (isDark ? Colors.grey[400] : Colors.grey);
 
-    return Container(
-      // 根据视觉状态调整外边距
-      margin: EdgeInsets.symmetric(horizontal: renderCollapsed ? 8 : 12, vertical: 4),
-      child: Tooltip(
-        message: renderCollapsed ? title : "", 
-        child: ListTile(
-          // 【防崩关键】折叠时去掉内边距，给内容留出空间
-          contentPadding: renderCollapsed 
-              ? EdgeInsets.zero 
-              : const EdgeInsets.symmetric(horizontal: 16),
-          
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          
-          // 【防崩关键】折叠时最小前导宽度设为0
-          minLeadingWidth: renderCollapsed ? 0 : null,
-          
-          leading: Container(
-             // 【防崩关键】折叠时限制宽度为 40，确保一定要小于 Sidebar 的总宽度
-             width: renderCollapsed ? 40 : null,
-             alignment: Alignment.center,
-             child: Icon(
-              icon,
-              color: isSelected 
-                  ? Theme.of(context).primaryColor 
-                  : (isDark ? Colors.grey[400] : Colors.grey),
+    // 选中时的背景色
+    final selectedBgColor = primaryColor.withOpacity(isDark ? 0.2 : 0.1);
+
+    if (renderCollapsed) {
+      // === 模式 A：折叠状态 (Icon Only) ===
+      // 直接使用 Container + Icon，不使用 ListTile，绝对不会报错
+      return Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => onItemSelected(index),
+          child: Container(
+            height: 50, // 固定高度
+            margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+            decoration: BoxDecoration(
+              color: isSelected ? selectedBgColor : Colors.transparent,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            alignment: Alignment.center,
+            child: Tooltip(
+              message: title, // 鼠标悬停显示文字
+              child: Icon(icon, color: iconColor),
             ),
           ),
-          
-          // 只有视觉上展开时才渲染标题 Text 组件
-          title: renderCollapsed
-              ? null
-              : Text(
-                  title,
-                  style: TextStyle(
-                    color: isSelected 
-                        ? Theme.of(context).primaryColor 
-                        : (isDark ? Colors.white70 : Colors.black87),
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  ),
-                ),
-                
-          selected: isSelected,
-          selectedTileColor: Theme.of(context).primaryColor.withOpacity(isDark ? 0.2 : 0.1),
-          onTap: () => onItemSelected(index),
         ),
-      ),
-    );
+      );
+    } else {
+      // === 模式 B：展开状态 (完整列表项) ===
+      // 宽度足够，使用标准的 ListTile
+      return Container(
+        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        child: ListTile(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          leading: Icon(icon, color: iconColor),
+          title: Text(
+            title,
+            style: TextStyle(
+              color: isSelected ? primaryColor : (isDark ? Colors.white70 : Colors.black87),
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+          selected: isSelected,
+          selectedTileColor: selectedBgColor,
+          onTap: () => onItemSelected(index),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+        ),
+      );
+    }
   }
 }
