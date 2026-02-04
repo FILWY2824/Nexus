@@ -1,6 +1,7 @@
 // lib/pages/login_page.dart
 import 'package:flutter/material.dart';
-import '../services/mock_service.dart';
+
+import 'package:dashboard/shared/services/mock_service.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});

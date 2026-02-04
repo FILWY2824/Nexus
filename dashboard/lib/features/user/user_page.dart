@@ -1,7 +1,8 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import '../services/mock_service.dart';
-import 'landing_page.dart';
+
+import 'package:dashboard/shared/services/mock_service.dart';
+import 'package:dashboard/features/home/landing_page.dart';
 
 class UserPage extends StatelessWidget {
   const UserPage({super.key});

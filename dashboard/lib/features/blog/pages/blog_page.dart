@@ -3,9 +3,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../services/mock_service.dart';
-import 'article_detail_page.dart';
-import 'editor_page.dart';
+import 'package:dashboard/shared/services/mock_service.dart';
+import 'package:dashboard/features/blog/pages/article_detail_page.dart';
+import 'package:dashboard/features/blog/pages/editor_page.dart';
 
 /// ✅ BlogPage is now a **nested Navigator**.
 /// This keeps the global left Sidebar always visible (Yuque-like workspace).

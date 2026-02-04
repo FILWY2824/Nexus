@@ -1,7 +1,7 @@
 // lib/main.dart
 import 'package:flutter/material.dart';
-import 'pages/landing_page.dart';
-import 'services/mock_service.dart';
+import 'package:dashboard/features/home/landing_page.dart';
+import 'package:dashboard/shared/services/mock_service.dart';
 
 void main() {
   runApp(const MyApp());

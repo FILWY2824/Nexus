@@ -16,8 +16,8 @@ import 'package:http/http.dart' as http;
 // ✅ Clipboard (images + text)
 import 'package:super_clipboard/super_clipboard.dart';
 
-import '../services/mock_service.dart';
-import '../widgets/yuque_markdown_view.dart';
+import 'package:dashboard/shared/services/mock_service.dart';
+import 'package:dashboard/features/blog/widgets/yuque_markdown_view.dart';
 
 // 编辑器视图模式：单页（源码） / 双页（源码+预览） / 实时（所见即所得风格的“高亮编辑”）
 enum EditorMode { edit, split, live }

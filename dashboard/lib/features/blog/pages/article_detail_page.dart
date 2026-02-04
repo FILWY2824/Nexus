@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:markdown_widget/markdown_widget.dart';
 
-import '../services/mock_service.dart';
-import '../widgets/yuque_markdown_view.dart';
+import 'package:dashboard/shared/services/mock_service.dart';
+import 'package:dashboard/features/blog/widgets/yuque_markdown_view.dart';
 
 class ArticleDetailPage extends StatefulWidget {
   final Article article;

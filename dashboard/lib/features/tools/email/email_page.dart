@@ -7,8 +7,9 @@ import 'package:webview_flutter/webview_flutter.dart';
 // 【核心修复】条件导入：
 // 编译 Web 版时 -> 引入 web_helpers_web.dart (包含 dart:html)
 // 编译 Android 版时 -> 引入 web_helpers_stub.dart (空文件)
-import '../services/web_helpers_stub.dart' 
-    if (dart.library.html) '../services/web_helpers_web.dart';
+// ✅ 替换为新的绝对路径引用：
+import 'package:dashboard/shared/services/web_helpers_stub.dart' 
+    if (dart.library.html) 'package:dashboard/shared/services/web_helpers_web.dart';
 
 class EmailPage extends StatefulWidget {
   const EmailPage({super.key});

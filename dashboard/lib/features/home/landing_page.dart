@@ -1,9 +1,10 @@
 // lib/pages/landing_page.dart
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../services/mock_service.dart';
-import 'dashboard.dart';
-import 'login_page.dart';
+
+import 'package:dashboard/shared/services/mock_service.dart';
+import 'package:dashboard/features/workspace/dashboard.dart';
+import 'package:dashboard/features/auth/login_page.dart';
 
 class LandingPage extends StatelessWidget {
   const LandingPage({super.key});

@@ -1,9 +1,10 @@
 // lib/widgets/sidebar.dart
 import 'package:flutter/material.dart';
-import '../services/mock_service.dart';
-import '../pages/login_page.dart';
-import '../pages/landing_page.dart';
-import '../pages/user_page.dart';
+
+import 'package:dashboard/shared/services/mock_service.dart';
+import 'package:dashboard/features/auth/login_page.dart';
+import 'package:dashboard/features/home/landing_page.dart';
+import 'package:dashboard/features/user/user_page.dart';
 
 class Sidebar extends StatelessWidget {
   final int selectedIndex;

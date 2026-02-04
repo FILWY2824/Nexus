@@ -6,7 +6,7 @@ import 'package:flutter_highlight/themes/github.dart';
 import 'package:markdown/markdown.dart' as m;
 import 'package:markdown_widget/markdown_widget.dart';
 
-import '../services/mock_service.dart';
+import 'package:dashboard/shared/services/mock_service.dart';
 
 /// A Yuque-like Markdown renderer:
 /// - GitHub-flavored Markdown

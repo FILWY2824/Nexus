@@ -1,10 +1,12 @@
 // lib/pages/dashboard.dart
 import 'package:flutter/material.dart';
-import '../widgets/sidebar.dart';
-import 'blog_page.dart';
-import 'email_page.dart';
-import 'gpt_page.dart';
-import 'landing_page.dart'; 
+
+import 'package:dashboard/features/workspace/widgets/sidebar.dart';
+import 'package:dashboard/features/blog/pages/blog_page.dart';
+import 'package:dashboard/features/tools/email/email_page.dart';
+import 'package:dashboard/features/tools/gpt/gpt_page.dart';
+import 'package:dashboard/features/home/landing_page.dart';
+
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
