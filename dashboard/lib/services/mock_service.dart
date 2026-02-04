@@ -25,6 +25,9 @@ class Article {
   final int views;
   final String content;
 
+  /// published / draft (Yuque-like)
+  final String status;
+
   Article({
     required this.id,
     required this.title,
@@ -33,6 +36,7 @@ class Article {
     required this.publishDate,
     required this.views,
     this.content = "",
+    this.status = "published",
   });
 
   factory Article.fromJson(Map<String, dynamic> json) {
@@ -46,6 +50,7 @@ class Article {
           : DateTime.now(),
       views: json['views'] is int ? json['views'] as int : int.tryParse(json['views'].toString()) ?? 0,
       content: (json['content'] ?? '').toString(),
+      status: (json['status'] ?? 'published').toString(),
     );
   }
 }
@@ -59,8 +64,7 @@ class AppService extends ChangeNotifier {
   factory AppService() => _instance;
   AppService._internal();
 
-  /// ✅ Cloudflare Tunnel 后端（不再使用内网 IP / 端口）
-  /// 你可以后续只改这一行。
+  /// ✅ 你可以后续只改这一行。
   final String baseUrl = 'https://backendapi.officecy.dpdns.org/api';
 
   User? _currentUser;
@@ -68,9 +72,9 @@ class AppService extends ChangeNotifier {
   bool get isLoggedIn => _currentUser != null;
   bool get isAdmin => _currentUser?.role == 'admin';
 
-  /// 用于“需要鉴权的接口”（例如 updateProfile / promote / publish 等）
+  /// 用于“需要鉴权的接口”（例如 updateProfile / promote / publish / save 等）
   /// 目前你的后端是 email+password 校验，所以前端临时保存一份。
-  /// （真正安全的做法是后端发 token/session；后续你要做我也能帮你改。）
+  /// （更安全的做法：后端发 token/session；后续你要做我也能帮你改。）
   String? _passwordInMemory;
 
   /// 用户资料（设置页会用）
@@ -328,7 +332,6 @@ class AppService extends ChangeNotifier {
   ///
   /// This returns the origin part so we can resolve relative URLs safely.
   String get origin {
-    // Keep it simple: remove the trailing `/api` if present.
     if (baseUrl.endsWith('/api')) {
       return baseUrl.substring(0, baseUrl.length - 4);
     }
@@ -336,10 +339,6 @@ class AppService extends ChangeNotifier {
   }
 
   /// Resolve a potentially-relative media URL into an absolute URL.
-  ///
-  /// - Already absolute: returned as-is.
-  /// - Starts with `/`: prefixed with [origin].
-  /// - Otherwise: `${origin}/$url`.
   String resolveMediaUrl(String url) {
     final u = url.trim();
     if (u.isEmpty) return u;
@@ -356,14 +355,40 @@ class AppService extends ChangeNotifier {
 class MockService {
   final String baseUrl = AppService().baseUrl;
 
-  Future<List<Article>> getArticles() async {
+  /// List articles.
+  ///
+  /// Backend now supports:
+  /// - GET /api/articles?status=published|draft|all
+  /// - (optional) q/sort/order for server-side filtering
+  ///
+  /// If backend is older, query params will be ignored or fallback will be used.
+  Future<List<Article>> getArticles({String status = 'published', String? q, String? sort, String? order}) async {
     try {
-      final resp = await http.get(Uri.parse('$baseUrl/articles')).timeout(const Duration(seconds: 12));
+      final params = <String, String>{};
+      if (status.trim().isNotEmpty) params['status'] = status.trim();
+      if (q != null && q.trim().isNotEmpty) params['q'] = q.trim();
+      if (sort != null && sort.trim().isNotEmpty) params['sort'] = sort.trim();
+      if (order != null && order.trim().isNotEmpty) params['order'] = order.trim();
+
+      Uri uri = Uri.parse('$baseUrl/articles');
+      if (params.isNotEmpty) {
+        uri = uri.replace(queryParameters: params);
+      }
+
+      http.Response resp = await http.get(uri).timeout(const Duration(seconds: 12));
+
+      // Fallback for older backends that don't like query params
+      if (resp.statusCode != 200 && params.isNotEmpty) {
+        resp = await http.get(Uri.parse('$baseUrl/articles')).timeout(const Duration(seconds: 12));
+      }
+
       if (resp.statusCode == 200) {
         final decoded = utf8.decode(resp.bodyBytes);
         final list = jsonDecode(decoded) as List<dynamic>;
         return list.map((j) => Article.fromJson(j as Map<String, dynamic>)).toList();
       }
+
+      debugPrint('❌ Get Articles Failed: ${resp.statusCode} ${utf8.decode(resp.bodyBytes)}');
     } catch (e) {
       debugPrint('❌ Get Articles Error: $e');
     }
@@ -371,14 +396,26 @@ class MockService {
   }
 
   /// Fetch a single article with full `content`.
-  /// Backend: GET /api/articles/<id>
-  Future<Article?> getArticleById(String id) async {
+  ///
+  /// - GET /api/articles/<id>
+  /// - If you want to fetch draft content: includeDraft=true (requires admin credentials)
+  Future<Article?> getArticleById(String id, {bool includeDraft = false}) async {
     try {
-      final resp = await http
-          .get(Uri.parse('$baseUrl/articles/$id'))
-          .timeout(const Duration(seconds: 12));
+      Uri uri = Uri.parse('$baseUrl/articles/$id');
 
+      if (includeDraft) {
+        final app = AppService();
+        final params = <String, String>{'includeDraft': '1'};
+        if (app.currentUser != null && app._passwordInMemory != null) {
+          params['email'] = app.currentUser!.email;
+          params['password'] = app._passwordInMemory!;
+        }
+        uri = uri.replace(queryParameters: params);
+      }
+
+      final resp = await http.get(uri).timeout(const Duration(seconds: 12));
       final decoded = utf8.decode(resp.bodyBytes);
+
       if (resp.statusCode == 200) {
         final map = jsonDecode(decoded) as Map<String, dynamic>;
         return Article.fromJson(map);
@@ -392,6 +429,74 @@ class MockService {
     }
   }
 
+  /// Save draft / autosave.
+  ///
+  /// Backend:
+  /// - POST /api/articles/save
+  /// - If id is null -> create draft (status=draft) and return id
+  /// - If id exists -> update
+  Future<String?> saveArticle({required String title, required String content, String? id}) async {
+    final app = AppService();
+    final user = app.currentUser;
+    if (user == null || app._passwordInMemory == null) {
+      app._setError('未登录');
+      return null;
+    }
+    if (!app.isAdmin) {
+      app._setError('权限不足：需要管理员账号');
+      return null;
+    }
+
+    try {
+      final body = <String, dynamic>{
+        'title': title,
+        'content': content,
+        'author': user.name,
+        'email': user.email,
+        'password': app._passwordInMemory,
+        if (id != null) 'id': id,
+      };
+
+      final resp = await http
+          .post(
+            Uri.parse('$baseUrl/articles/save'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(body),
+          )
+          .timeout(const Duration(seconds: 12));
+
+      final decoded = utf8.decode(resp.bodyBytes);
+
+      if (resp.statusCode == 200) {
+        try {
+          final data = jsonDecode(decoded);
+          final newId = (data['id'] ?? data['articleId'] ?? data['draftId'] ?? '').toString();
+          app._setError(null);
+          return newId.isEmpty ? id : newId;
+        } catch (_) {
+          // If server returns plain text
+          app._setError(null);
+          return id;
+        }
+      }
+
+      try {
+        final data = jsonDecode(decoded);
+        app._setError((data['message'] ?? '保存失败').toString());
+      } catch (_) {
+        app._setError('保存失败：${resp.statusCode} $decoded');
+      }
+
+      debugPrint('❌ Save Failed: ${resp.statusCode} $decoded');
+      return null;
+    } catch (e) {
+      app._setError('网络错误：$e');
+      debugPrint('❌ Save Error: $e');
+      return null;
+    }
+  }
+
+  /// Publish article (also works for publishing a draft if you pass its id).
   Future<bool> publishArticle(String title, String content, String? id) async {
     try {
       final app = AppService();
@@ -447,35 +552,47 @@ class MockService {
     }
   }
 
-  // 添加在 publishArticle 方法下方
   Future<bool> deleteArticle(String id) async {
     try {
       final app = AppService();
-      
-      // 1. 检查是否登录
+
       if (app.currentUser == null || app._passwordInMemory == null) {
+        app._setError('未登录');
         debugPrint('❌ Delete Failed: Not logged in');
         return false;
       }
 
-      // 2. 发送带凭据的请求
-      final resp = await http.post(
-        Uri.parse('$baseUrl/articles/delete'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'id': id,
-          'email': app.currentUser!.email,       // ✅ 使用真实当前用户邮箱
-          'password': app._passwordInMemory,     // ✅ 使用真实内存中保存的密码
-        }),
-      ).timeout(const Duration(seconds: 12));
+      final resp = await http
+          .post(
+            Uri.parse('$baseUrl/articles/delete'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'id': id,
+              'email': app.currentUser!.email,
+              'password': app._passwordInMemory,
+            }),
+          )
+          .timeout(const Duration(seconds: 12));
+
+      final decoded = utf8.decode(resp.bodyBytes);
 
       if (resp.statusCode == 200) {
+        app._setError(null);
         return true;
       }
 
-      debugPrint('❌ Delete Failed: ${resp.statusCode} ${utf8.decode(resp.bodyBytes)}');
+      try {
+        final data = jsonDecode(decoded);
+        app._setError((data['message'] ?? '删除失败').toString());
+      } catch (_) {
+        app._setError('删除失败：${resp.statusCode} $decoded');
+      }
+
+      debugPrint('❌ Delete Failed: ${resp.statusCode} $decoded');
       return false;
     } catch (e) {
+      final app = AppService();
+      app._setError('网络错误：$e');
       debugPrint('❌ Delete Error: $e');
       return false;
     }
