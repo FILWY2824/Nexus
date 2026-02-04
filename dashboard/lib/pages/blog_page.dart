@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import '../services/mock_service.dart';
 import 'editor_page.dart';
+import 'article_detail_page.dart';
 
 class BlogPage extends StatefulWidget {
   const BlogPage({super.key});
@@ -177,23 +178,122 @@ class _BlogPageState extends State<BlogPage> {
   Widget _buildArticleCard(Article article, bool canWrite) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        title: Text(article.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-        subtitle: Text(article.summary, maxLines: 2, overflow: TextOverflow.ellipsis),
-        trailing: canWrite
-            ? IconButton(
-                tooltip: "编辑",
-                icon: const Icon(Icons.edit_outlined),
-                onPressed: () async {
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => EditorPage(article: article)),
-                  );
-                  _refreshList();
-                },
-              )
-            : null,
+      clipBehavior: Clip.antiAlias, // 确保点击水波纹不溢出
+      child: InkWell(
+        // 1. 点击跳转到详情页
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => ArticleDetailPage(article: article)),
+          );
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 标题与操作栏
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(
+                      article.title, 
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  if (canWrite) ...[
+                    // 编辑按钮
+                    IconButton(
+                      icon: const Icon(Icons.edit_outlined, size: 20),
+                      tooltip: "编辑",
+                      constraints: const BoxConstraints(),
+                      onPressed: () async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => EditorPage(article: article)),
+                        );
+                        _refreshList();
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                    // 2. 删除按钮
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red),
+                      tooltip: "删除",
+                      constraints: const BoxConstraints(),
+                      onPressed: () => _confirmDelete(article),
+                    ),
+                  ]
+                ],
+              ),
+              const SizedBox(height: 8),
+              
+              // 摘要
+              Text(
+                article.summary,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.8)),
+              ),
+              const SizedBox(height: 12),
+
+              // 底部信息栏 (PublishDate, Views, Author)
+              Row(
+                children: [
+                  Icon(Icons.person, size: 14, color: Colors.grey),
+                  const SizedBox(width: 4),
+                  Text(article.author, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                  const SizedBox(width: 16),
+                  
+                  Icon(Icons.access_time, size: 14, color: Colors.grey),
+                  const SizedBox(width: 4),
+                  Text(
+                    article.publishDate.toString().split(' ')[0], // ✅ 修正：先转字符串再分割
+                    style: const TextStyle(fontSize: 12, color: Colors.grey)
+                  ),
+                  const Spacer(),
+                  
+                  Icon(Icons.visibility_outlined, size: 14, color: Colors.grey),
+                  const SizedBox(width: 4),
+                  Text("${article.views}", style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
+  }
+
+  // 删除确认弹窗
+  Future<void> _confirmDelete(Article article) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("确认删除"),
+        content: Text("确定要删除文章《${article.title}》吗？此操作无法撤销。"),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("取消")),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(context, true), 
+            child: const Text("删除"),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      final success = await _apiService.deleteArticle(article.id);
+      if (mounted) {
+        if (success) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("已删除")));
+          _refreshList();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("删除失败")));
+        }
+      }
+    }
   }
 }

@@ -34,6 +34,17 @@ dependencies:
   url_launcher: ^6.2.1
   # 用于后续 Python 接口请求 (GPT 功能)
   http: ^1.1.0
+  desktop_drop: ^0.4.4    # 用于文件拖拽
+  pasteboard: ^0.2.0      # 用于获取剪贴板图片
+  image_picker: ^1.0.7    # 用于从文件夹选择图片
+  path_provider: ^2.1.2   # 用于文件路径
+  # ✅ 核心渲染库（支持数学公式、代码高亮）
+  markdown_widget: any   # 你项目已在用
+  # ✅ 核心粘贴库（支持 Web/Desktop 图片粘贴）
+  super_clipboard: ^0.8.12
+  flutter_highlight: ^0.7.0
+  flutter_math_fork: ^0.7.4     # LaTeX 渲染 :contentReference[oaicite:7]{index=7}
+  cached_network_image: ^3.4.1  # 图片缓存/placeholder :contentReference[oaicite:8]{index=8}
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.

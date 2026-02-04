@@ -320,6 +320,33 @@ class AppService extends ChangeNotifier {
       return false;
     }
   }
+
+  // ---------- URL helpers (for images / attachments) ----------
+
+  /// Your API baseUrl ends with `/api`. Many media resources are served outside
+  /// that prefix (e.g. `/uploads/...`).
+  ///
+  /// This returns the origin part so we can resolve relative URLs safely.
+  String get origin {
+    // Keep it simple: remove the trailing `/api` if present.
+    if (baseUrl.endsWith('/api')) {
+      return baseUrl.substring(0, baseUrl.length - 4);
+    }
+    return baseUrl;
+  }
+
+  /// Resolve a potentially-relative media URL into an absolute URL.
+  ///
+  /// - Already absolute: returned as-is.
+  /// - Starts with `/`: prefixed with [origin].
+  /// - Otherwise: `${origin}/$url`.
+  String resolveMediaUrl(String url) {
+    final u = url.trim();
+    if (u.isEmpty) return u;
+    if (u.startsWith('http://') || u.startsWith('https://')) return u;
+    if (u.startsWith('/')) return '$origin$u';
+    return '$origin/$u';
+  }
 }
 
 // ===========================
@@ -343,11 +370,36 @@ class MockService {
     return [];
   }
 
+  /// Fetch a single article with full `content`.
+  /// Backend: GET /api/articles/<id>
+  Future<Article?> getArticleById(String id) async {
+    try {
+      final resp = await http
+          .get(Uri.parse('$baseUrl/articles/$id'))
+          .timeout(const Duration(seconds: 12));
+
+      final decoded = utf8.decode(resp.bodyBytes);
+      if (resp.statusCode == 200) {
+        final map = jsonDecode(decoded) as Map<String, dynamic>;
+        return Article.fromJson(map);
+      }
+
+      debugPrint('❌ Get Article Failed: ${resp.statusCode} $decoded');
+      return null;
+    } catch (e) {
+      debugPrint('❌ Get Article Error: $e');
+      return null;
+    }
+  }
+
   Future<bool> publishArticle(String title, String content, String? id) async {
     try {
       final app = AppService();
       final user = app.currentUser;
-      if (user == null) return false;
+      if (user == null) {
+        app._setError('未登录');
+        return false;
+      }
 
       final body = <String, dynamic>{
         'title': title,
@@ -370,12 +422,61 @@ class MockService {
           )
           .timeout(const Duration(seconds: 12));
 
-      if (resp.statusCode == 200) return true;
+      final decoded = utf8.decode(resp.bodyBytes);
 
-      debugPrint('❌ Publish Failed: ${resp.statusCode} ${utf8.decode(resp.bodyBytes)}');
+      if (resp.statusCode == 200) {
+        app._setError(null);
+        return true;
+      }
+
+      // Try best-effort to parse server message.
+      try {
+        final data = jsonDecode(decoded);
+        app._setError((data['message'] ?? '发布失败').toString());
+      } catch (_) {
+        app._setError('发布失败：${resp.statusCode} $decoded');
+      }
+
+      debugPrint('❌ Publish Failed: ${resp.statusCode} $decoded');
       return false;
     } catch (e) {
+      final app = AppService();
+      app._setError('网络错误：$e');
       debugPrint('❌ Publish Error: $e');
+      return false;
+    }
+  }
+
+  // 添加在 publishArticle 方法下方
+  Future<bool> deleteArticle(String id) async {
+    try {
+      final app = AppService();
+      
+      // 1. 检查是否登录
+      if (app.currentUser == null || app._passwordInMemory == null) {
+        debugPrint('❌ Delete Failed: Not logged in');
+        return false;
+      }
+
+      // 2. 发送带凭据的请求
+      final resp = await http.post(
+        Uri.parse('$baseUrl/articles/delete'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'id': id,
+          'email': app.currentUser!.email,       // ✅ 使用真实当前用户邮箱
+          'password': app._passwordInMemory,     // ✅ 使用真实内存中保存的密码
+        }),
+      ).timeout(const Duration(seconds: 12));
+
+      if (resp.statusCode == 200) {
+        return true;
+      }
+
+      debugPrint('❌ Delete Failed: ${resp.statusCode} ${utf8.decode(resp.bodyBytes)}');
+      return false;
+    } catch (e) {
+      debugPrint('❌ Delete Error: $e');
       return false;
     }
   }

@@ -22,6 +22,15 @@ class MyApp extends StatelessWidget {
           theme: ThemeData(
             useMaterial3: true,
             brightness: Brightness.light,
+
+            // ✅【修改 1】在此处添加字体后备列表，指定常见的中文字体
+            fontFamilyFallback: const [
+              "Microsoft YaHei", // Windows
+              "PingFang SC",     // macOS/iOS
+              "Noto Sans SC",    // Linux/Android
+              "sans-serif",      // 通用后备
+            ],
+
             // 【核心美化】定义更现代的配色和字体基础
             colorScheme: ColorScheme.fromSeed(
               seedColor: const Color(0xFF6366F1), // 靛蓝
@@ -39,6 +48,15 @@ class MyApp extends StatelessWidget {
           darkTheme: ThemeData(
             useMaterial3: true,
             brightness: Brightness.dark,
+
+            // ✅【修改 2】暗色主题也要加上这一段
+            fontFamilyFallback: const [
+              "Microsoft YaHei", 
+              "PingFang SC", 
+              "Noto Sans SC", 
+              "sans-serif",
+            ],
+            
             colorScheme: ColorScheme.fromSeed(
               seedColor: const Color(0xFF6366F1),
               brightness: Brightness.dark,
